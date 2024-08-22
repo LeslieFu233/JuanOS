@@ -63,6 +63,9 @@ CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
+CXX = $(TOOLPREFIX)g++
+CXXFLAGS = -Wall -O2
+
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie -no-pie
@@ -106,6 +109,19 @@ $U/_forktest: $U/forktest.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
 	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
 
+$U/cpp_test.o: $U/cpp_test.cpp
+		$(CXX) $(CXXFLAGS) -c -o $U/cpp_test.o $U/cpp_test.cpp
+
+$U/cpp_test_c.o: $U/cpp_test_c.c $(ULIB)
+		$(CC) $(CFLAGS) -c -o $U/cpp_test_c.o $U/cpp_test_c.c
+
+$U/_example: $U/cpp_test_c.o $U/cpp_test.o $(ULIB)
+		$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $^
+		$(OBJDUMP) -S $U/_example > $U/example.asm
+		$(OBJDUMP) -t $U/_example | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/example.sym
+
+
+
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
 
@@ -132,6 +148,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_example\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
